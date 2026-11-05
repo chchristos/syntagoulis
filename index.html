@@ -61,7 +61,7 @@
             </div>
             
             <div class="flex items-center gap-1.5 shrink-0">
-                <!-- PWA Install Button (Appears automatically on Mobile/Chrome) -->
+                <!-- PWA Install Button -->
                 <button id="install-pwa-btn" onclick="installPWA()" class="px-2.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 text-xs font-bold flex items-center gap-1 border border-amber-500/30 transition" title="Εγκατάσταση App">
                     <i class="fa-solid fa-download"></i>
                     <span class="hidden sm:inline">Install</span>
@@ -390,6 +390,38 @@
 
             <div class="pt-3 border-t border-slate-800 flex justify-end">
                 <button onclick="saveSettings()" class="px-5 py-2 rounded-xl bg-brand-600 text-white font-semibold">Αποθήκευση</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-800 text-slate-200 text-xs px-4 py-2.5 rounded-full shadow-2xl opacity-0 transition-all pointer-events-none z-50 flex items-center gap-2">
+        <span id="toast-msg"></span>
+    </div>
+
+    <!-- APPLICATION LOGIC -->
+    <script>
+        // APP STATE
+        let state = {
+            recipes: [],
+            categories: ["Κυρίως", "Σούπες", "Air Fryer", "High Protein", "Ψωμί & Ζύμες", "Γρήγορα", "Γλυκά", "Άλλο"],
+            equipment: ["Air Fryer", "Παρασκευαστής Ψωμιού", "Χύτρα Ταχύτητας", "One-Pot", "Φούρνος", "Τηγάνι"],
+            shoppingList: [],
+            selectedCategory: 'ALL',
+            selectedEquipment: 'ALL',
+            searchQuery: '',
+            gdriveClientId: '',
+            gdriveToken: null,
+            gdriveTokenExpires: 0
+        };
+
+        let currentCookRecipe = null;
+        let cookServings = 1;
+        let timerInterval = null;
+        let timerSeconds = 0;
+        let activeShareRecipe = null;
+        let tokenClient = null;
+
         // SANITIZATION UTILITY: Strips AI formatting spans & markdown markers
         function sanitizeText(str) {
             if (!str || typeof str !== 'string') return str || '';
@@ -402,9 +434,24 @@
                 .trim();
         }
 
+        function sanitizeRecipe(r) {
+            if (!r) return r;
+            return {
+                ...r,
+                title: sanitizeText(r.title),
+                category: sanitizeText(r.category),
+                equipment: sanitizeText(r.equipment),
+                ingredients: (r.ingredients || []).map(i => ({
+                    ...i,
+                    unit: sanitizeText(i.unit),
+                    name: sanitizeText(i.name)
+                })),
+                steps: (r.steps || []).map(s => sanitizeText(s))
+            };
+        }
+
         // PWA MANIFEST & SERVICE WORKER INITIALIZATION
         function initPWA() {
-            // Dynamic Manifest Generation
             const manifestObj = {
                 name: "Syntagoulis - Smart Recipe Manager",
                 short_name: "Syntagoulis",
@@ -421,7 +468,6 @@
             const manifestLink = document.getElementById('pwa-manifest');
             if (manifestLink) manifestLink.href = URL.createObjectURL(manifestBlob);
 
-            // Register minimal inline Service Worker
             if ('serviceWorker' in navigator) {
                 const swCode = `
                     self.addEventListener('install', e => self.skipWaiting());
@@ -481,7 +527,6 @@
                     if (parsed.equipment) state.equipment = parsed.equipment;
                     if (parsed.shoppingList) state.shoppingList = parsed.shoppingList;
                     if (parsed.gdriveClientId) state.gdriveClientId = parsed.gdriveClientId;
-                    // Auto-save cleaned state back to local storage
                     saveLocalState();
                 } catch(e) { console.error("Error loading state", e); }
             }
@@ -882,7 +927,7 @@
                 `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
         }
 
-        // SMART BATCH IMPORT (AI AGENT & SANITIZER)
+        // SMART BATCH IMPORT
         function importBatchJSON(overwrite = false) {
             const val = document.getElementById('batch-json-input').value.trim();
             if (!val) return;
@@ -920,7 +965,7 @@
             }
         }
 
-        // SHARE & QR CODE FIXED REPLACEMENT
+        // SHARE & QR CODE
         function openShareModal(id) {
             activeShareRecipe = state.recipes.find(r => r.id === id);
             if (!activeShareRecipe) return;
@@ -1177,30 +1222,82 @@
             reader.readAsText(file);
         }
 
-        // GOOGLE DRIVE AUTO-SYNC (GIS)
+        // GOOGLE DRIVE AUTO-SYNC (GIS) & PERSISTENT AUTH
+        function setDriveBadgeActive() {
+            const badge = document.getElementById('sync-badge');
+            if (badge) {
+                badge.textContent = 'Drive Active';
+                badge.className = 'text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium whitespace-nowrap';
+            }
+        }
+
+        function setDriveBadgeInactive() {
+            const badge = document.getElementById('sync-badge');
+            if (badge) {
+                badge.textContent = 'Local Mode';
+                badge.className = 'text-[9px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 font-normal whitespace-nowrap';
+            }
+        }
+
         function initGIS() {
             if (!state.gdriveClientId || typeof google === 'undefined') return;
+
             tokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: state.gdriveClientId,
                 scope: 'https://www.googleapis.com/auth/drive.appdata',
                 callback: (resp) => {
                     if (resp.access_token) {
                         state.gdriveToken = resp.access_token;
-                        document.getElementById('sync-badge').textContent = 'Drive Active';
-                        document.getElementById('sync-badge').className = 'text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium whitespace-nowrap';
+                        const expiresInMs = (resp.expires_in || 3600) * 1000;
+                        state.gdriveTokenExpires = Date.now() + expiresInMs;
+                        
+                        localStorage.setItem('syntagoulis_gdrive_token', resp.access_token);
+                        localStorage.setItem('syntagoulis_gdrive_expires', state.gdriveTokenExpires.toString());
+                        localStorage.setItem('syntagoulis_gdrive_autologin', 'true');
+
+                        setDriveBadgeActive();
                         triggerDriveAutoSync();
                     }
                 }
             });
+
+            // Check if saved token is still valid on reload
+            const savedToken = localStorage.getItem('syntagoulis_gdrive_token');
+            const savedExpires = parseInt(localStorage.getItem('syntagoulis_gdrive_expires') || '0');
+            const autoLogin = localStorage.getItem('syntagoulis_gdrive_autologin') === 'true';
+
+            if (savedToken && Date.now() < (savedExpires - 60000)) {
+                // Token is still valid
+                state.gdriveToken = savedToken;
+                state.gdriveTokenExpires = savedExpires;
+                setDriveBadgeActive();
+                triggerDriveAutoSync();
+            } else if (autoLogin && tokenClient) {
+                // Attempt silent re-authentication if token expired but user previously authorized
+                setTimeout(() => {
+                    try {
+                        tokenClient.requestAccessToken({ prompt: '' });
+                    } catch(e) { console.log("Silent auth failed", e); }
+                }, 1000);
+            }
         }
 
         function handleAuthClick() {
+            const inputVal = document.getElementById('gdrive-client-id').value.trim();
+            if (inputVal) {
+                state.gdriveClientId = inputVal;
+                saveLocalState();
+            }
+
             if (!state.gdriveClientId) {
                 alert("Συμπληρώστε πρώτα το Google Client ID!");
                 return;
             }
+
             if (!tokenClient) initGIS();
-            tokenClient.requestAccessToken({ prompt: 'consent' });
+            if (tokenClient) {
+                tokenClient.requestAccessToken({ prompt: 'consent' });
+            }
         }
 
         let driveSyncTimeout = null;
@@ -1216,6 +1313,15 @@
                 const searchRes = await fetch('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder', {
                     headers: { Authorization: `Bearer ${state.gdriveToken}` }
                 });
+
+                if (searchRes.status === 401) {
+                    // Token expired - attempt silent refresh
+                    setDriveBadgeInactive();
+                    localStorage.removeItem('syntagoulis_gdrive_token');
+                    if (tokenClient) tokenClient.requestAccessToken({ prompt: '' });
+                    return;
+                }
+
                 const searchData = await searchRes.json();
                 const file = searchData.files?.find(f => f.name === 'syntagoulis_data.json');
 
@@ -1237,6 +1343,7 @@
                         body: form
                     });
                 }
+                setDriveBadgeActive();
                 showToast("🔒 Συγχρονίστηκε στο Google Drive");
             } catch(e) { console.error("Drive sync error", e); }
         }
