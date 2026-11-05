@@ -53,7 +53,7 @@
             
             <div class="flex items-center gap-1.5 shrink-0">
                 <!-- Navigation Link to Meal Planner -->
-                <a href="planner.html" class="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-brand-400 text-xs font-bold flex items-center gap-1.5 border border-slate-700 transition" title="Εβδομαδιαίο Πλάνο">
+                <a href="syntagoulis_planner.html" class="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-brand-400 text-xs font-bold flex items-center gap-1.5 border border-slate-700 transition" title="Εβδομαδιαίο Πλάνο">
                     <i class="fa-solid fa-calendar-week"></i>
                     <span class="hidden sm:inline text-slate-200">Πλάνο</span>
                 </a>
@@ -407,7 +407,7 @@
         let activeShareRecipe = null;
         let tokenClient = null;
 
-        // SANITIZATION UTILITY: Strips AI formatting spans & markdown markers
+        // SANITIZATION UTILITY: Strips AI formatting spans & markdown markers across all fields
         function sanitizeText(str) {
             if (!str || typeof str !== 'string') return str || '';
             return str
@@ -415,8 +415,32 @@
                 .replace(/\(start_span\)/gi, '')
                 .replace(/\(end_span\)/gi, '')
                 .replace(/\[\/?span[^\]]*\]/gi, '')
+                .replace(/\[\d+\]/g, '')
                 .replace(/^#+\s*/, '')
+                .replace(/\s+/g, ' ')
                 .trim();
+        }
+
+        function sanitizeRecipe(r) {
+            if (!r || typeof r !== 'object') return r;
+            return {
+                ...r,
+                title: sanitizeText(r.title),
+                category: sanitizeText(r.category),
+                equipment: sanitizeText(r.equipment),
+                ingredients: (r.ingredients || []).map(i => {
+                    if (typeof i === 'string') {
+                        return { amount: 1, unit: 'τμχ', name: sanitizeText(i) };
+                    }
+                    return {
+                        ...i,
+                        amount: i.amount || 1,
+                        unit: sanitizeText(i.unit),
+                        name: sanitizeText(i.name)
+                    };
+                }),
+                steps: (r.steps || []).map(s => sanitizeText(s))
+            };
         }
 
         // INITIALIZATION
@@ -438,14 +462,13 @@
             if (saved) {
                 try {
                     const parsed = JSON.parse(saved);
-                    state.recipes = (parsed.recipes || []).map(r => ({
-                        ...r,
-                        title: sanitizeText(r.title)
-                    }));
+                    state.recipes = (parsed.recipes || []).map(sanitizeRecipe);
                     if (parsed.categories) state.categories = parsed.categories;
                     if (parsed.equipment) state.equipment = parsed.equipment;
                     if (parsed.shoppingList) state.shoppingList = parsed.shoppingList;
                     if (parsed.gdriveClientId) state.gdriveClientId = parsed.gdriveClientId;
+                    // Auto-save cleaned state back to local storage
+                    saveLocalState();
                 } catch(e) { console.error("Error loading state", e); }
             }
         }
@@ -643,18 +666,18 @@
                 if (inputs[2].value.trim()) {
                     ingredients.push({
                         amount: parseFloat(inputs[0].value) || 1,
-                        unit: inputs[1].value.trim(),
-                        name: inputs[2].value.trim()
+                        unit: sanitizeText(inputs[1].value),
+                        name: sanitizeText(inputs[2].value)
                     });
                 }
             });
 
             const stepRows = document.querySelectorAll('#steps-container input');
-            const steps = Array.from(stepRows).map(i => i.value.trim()).filter(Boolean);
+            const steps = Array.from(stepRows).map(i => sanitizeText(i.value)).filter(Boolean);
 
-            const recipe = {
+            const recipe = sanitizeRecipe({
                 id,
-                title: sanitizeText(document.getElementById('form-title').value),
+                title: document.getElementById('form-title').value,
                 category: document.getElementById('form-category').value,
                 equipment: document.getElementById('form-equipment').value,
                 prepTime: parseInt(document.getElementById('form-preptime').value) || 0,
@@ -668,7 +691,7 @@
                 },
                 ingredients,
                 steps
-            };
+            });
 
             const idx = state.recipes.findIndex(r => r.id === id);
             if (idx >= 0) state.recipes[idx] = recipe;
@@ -854,17 +877,17 @@
                 let parsed = JSON.parse(val);
                 if (!Array.isArray(parsed)) parsed = [parsed];
 
-                const formatted = parsed.map(r => ({
+                const formatted = parsed.map(r => sanitizeRecipe({
                     id: r.id || 'rec_' + Math.random().toString(36).substr(2, 9),
-                    title: sanitizeText(r.title) || 'Χωρίς Τίτλο',
+                    title: r.title || 'Χωρίς Τίτλο',
                     category: state.categories.includes(r.category) ? r.category : 'Άλλο',
                     equipment: r.equipment || '',
                     prepTime: parseInt(r.prepTime) || 10,
                     cookTime: parseInt(r.cookTime) || 20,
                     servings: parseInt(r.servings) || 2,
                     macros: r.macros || { calories: 0, protein: 0, carbs: 0, fat: 0 },
-                    ingredients: (r.ingredients || []).map(i => typeof i === 'string' ? { amount: 1, unit: 'τμχ', name: i } : i),
-                    steps: (r.steps || []).map(s => String(s))
+                    ingredients: r.ingredients || [],
+                    steps: r.steps || []
                 }));
 
                 if (overwrite) {
@@ -1125,10 +1148,7 @@
                 try {
                     const parsed = JSON.parse(evt.target.result);
                     if (parsed.recipes) {
-                        state.recipes = parsed.recipes.map(r => ({
-                            ...r,
-                            title: sanitizeText(r.title)
-                        }));
+                        state.recipes = parsed.recipes.map(sanitizeRecipe);
                     }
                     if (parsed.categories) state.categories = parsed.categories;
                     if (parsed.equipment) state.equipment = parsed.equipment;
