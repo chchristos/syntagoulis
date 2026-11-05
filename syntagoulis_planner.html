@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="el" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Syntagoulis Planner - Εβδομαδιαίο Πλάνο Γευμάτων</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .scrollbar-none::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-none {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans pb-24 selection:bg-brand-500 selection:text-white">
+
+    <!-- Header -->
+    <header class="sticky top-0 z-30 bg-slate-900/90 backdrop-blur border-b border-slate-800 px-4 py-3">
+        <div class="max-w-5xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-amber-500 flex items-center justify-center text-white text-xl font-bold shadow-lg shadow-brand-500/20">
+                    📅
+                </div>
+                <div>
+                    <h1 class="text-xl font-black tracking-tight text-white flex items-center gap-2">
+                        Syntagoulis Planner
+                    </h1>
+                    <p class="text-[11px] text-slate-400 font-medium">Weekly Meal & Prep Planner by Christos</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <a href="index.html" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition">
+                    <i class="fa-solid fa-book-open text-brand-400"></i>
+                    <span class="hidden sm:inline">Συνταγές</span>
+                </a>
+                <button onclick="openShoppingModal()" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 relative transition" title="Λίστα Αγορών">
+                    <i class="fa-solid fa-cart-shopping text-sm"></i>
+                    <span id="cart-badge" class="hidden absolute -top-1 -right-1 w-4 h-4 bg-brand-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">0</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-5xl mx-auto px-4 pt-4 space-y-4">
+        
+        <!-- Controls & Actions Toolbar -->
+        <div class="bg-slate-900/80 p-4 rounded-2xl border border-slate-800 space-y-3 shadow-lg">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+                <div>
+                    <h2 class="text-sm font-bold text-slate-100 flex items-center gap-2">
+                        <i class="fa-solid fa-calendar-week text-brand-500"></i> Πρόγραμμα Εβδομάδας
+                    </h2>
+                    <p class="text-[11px] text-slate-400">Οργανώστε τα γεύματα της εβδομάδας και δημιουργήστε αυτόματα τη λίστα αγορών.</p>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                    <button onclick="openMealAssignModal()" class="px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-brand-600/20 transition">
+                        <i class="fa-solid fa-plus"></i> Προσθήκη / Ανάθεση Γεύματος
+                    </button>
+                    <button onclick="openGenerateShoppingModal()" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-600/20 transition">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Δημιουργία Λίστας Αγορών
+                    </button>
+                    <button onclick="copyWeeklyPlanText()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition" title="Αντιγραφή Πλάνου (Text)">
+                        <i class="fa-regular fa-copy"></i>
+                    </button>
+                    <button onclick="confirmResetWeek()" class="p-2 rounded-xl bg-slate-800 hover:bg-rose-900/50 text-rose-400 text-xs font-semibold transition" title="Εκκαθάριση Εβδομάδας">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Mobile Day Navigation Tabs -->
+            <div class="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
+                <button onclick="filterDay('ALL')" id="day-tab-ALL" class="day-tab px-3.5 py-1.5 rounded-full font-semibold transition bg-brand-600 text-white">Όλες οι Ημέρες</button>
+                <button onclick="filterDay('Δευτέρα')" id="day-tab-Δευτέρα" class="day-tab px-3.5 py-1.5 rounded-full font-medium bg-slate-800 text-slate-400 hover:text-white">Δευτέρα</button>
+                <button onclick="filterDay('Τρίτη')" id="day-tab-Τρίτη" class="day-tab px-3.5 py-1.5 rounded-full font-medium bg-slate-800 text-slate-400 hover:text-white">Τρίτη</button>
+                <button onclick="filterDay('Τετάρτη')" id="day-tab-Τετάρτη" class="day-tab px-3.5 py-1.5 rounded-full font-medium bg-slate-800 text-slate-400 hover:text-white">Τετάρτη</button>
+                <button onclick="filterDay('Πέμπτη')" id="day-tab-Πέμπτη" class="day-tab px-3.5 py-1.5 rounded-full font-medium bg-slate-800 text-slate-400 hover:text-white">Πέμπτη</button>
+                <button onclick="filterDay('Παρασκευή')" id="day-tab-Παρασκευή" class="day-tab px-3.5 py-1.5 rounded-full font-medium bg-slate-800 text-slate-400 hover:text-white">Παρασκευή</button>
+                <button onclick="filterDay('Σάββατο')" id="day-tab-Σάββατο" class="day-tab px-3.5 py-1.5 rounded-full font-medium bg-slate-800 text-slate-400 hover:text-white">Σάββατο</button>
+                <button onclick="filterDay('Κυριακή')" id="day-tab-Κυριακή" class="day-tab px-3.5 py-1.5 rounded-full font-medium bg-slate-800 text-slate-400 hover:text-white">Κυριακή</button>
+            </div>
+        </div>
+
+        <!-- Weekly Plan Grid -->
+        <div id="days-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Dynamic Days rendering -->
+        </div>
+
+    </main>
+
+    <!-- MODAL 1: Assign Meal (Supports Batch / Multi-Day Assignment) -->
+    <div id="assign-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+            <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+                <h3 class="font-bold text-slate-100 text-base flex items-center gap-2">
+                    <i class="fa-solid fa-calendar-plus text-brand-500"></i> Προσθήκη / Ανάθεση Γεύματος
+                </h3>
+                <button onclick="closeModal('assign-modal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <form onsubmit="saveMealAssignment(event)" class="p-5 overflow-y-auto space-y-4 text-xs">
+                
+                <!-- Type Toggle: Recipe vs Custom Text -->
+                <div class="flex p-1 bg-slate-950 rounded-xl border border-slate-800">
+                    <button type="button" onclick="setMealSourceType('recipe')" id="source-btn-recipe" class="flex-1 py-2 rounded-lg font-bold transition bg-brand-600 text-white">
+                        <i class="fa-solid fa-book-open mr-1"></i> Από τις Συνταγές μου
+                    </button>
+                    <button type="button" onclick="setMealSourceType('custom')" id="source-btn-custom" class="flex-1 py-2 rounded-lg font-bold transition text-slate-400 hover:text-white">
+                        <i class="fa-solid fa-pen-to-square mr-1"></i> Ελεύθερο Κείμενο
+                    </button>
+                </div>
+
+                <!-- Recipe Selection -->
+                <div id="source-recipe-container" class="space-y-1">
+                    <label class="block font-semibold text-slate-300">Επιλογή Συνταγής</label>
+                    <select id="assign-recipe-select" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-100 focus:border-brand-500 outline-none text-xs">
+                        <!-- Populated dynamically -->
+                    </select>
+                </div>
+
+                <!-- Custom Text Input -->
+                <div id="source-custom-container" class="space-y-2 hidden">
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Τίτλος Γεύματος / Φαγητού</label>
+                        <input type="text" id="assign-custom-title" placeholder="π.χ. Ομελέτα 3 αυγά με βρώμη & τομάτα" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:border-brand-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-300 mb-1">Υλικά για τη Λίστα Αγορών (χωρισμένα με κόμμα)</label>
+                        <input type="text" id="assign-custom-ingredients" placeholder="π.χ. Αυγά 3τμχ, Βρώμη 50g, Τομάτες 2τμχ" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-100 focus:border-brand-500 outline-none">
+                    </div>
+                </div>
+
+                <!-- Target Days Selector (Multi-select Batch) -->
+                <div class="space-y-2 bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800">
+                    <div class="flex justify-between items-center">
+                        <label class="font-bold text-slate-200">Ημέρες Τοποθέτησης (Πολλαπλή Επιλογή)</label>
+                        <button type="button" onclick="selectAllDays(true)" class="text-[10px] text-brand-400 hover:underline">Όλες</button>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <label class="flex items-center gap-2 p-2 bg-slate-900 border border-slate-800 rounded-xl cursor-pointer">
+                            <input type="checkbox" name="assign-days" value="Δευτέρα" class="accent-brand-500 rounded">
+                            <span class="text-slate-200 font-medium">Δευτέρα</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-2 bg-slate-900 border border-slate-800 rounded-xl cursor-pointer">
+                            <input type="checkbox" name="assign-days" value="Τρίτη" class="accent-brand-500 rounded">
+                            <span class="text-slate-200 font-medium">Τρίτη</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-2 bg-slate-900 border border-slate-800 rounded-xl cursor-pointer">
+                            <input type="checkbox" name="assign-days" value="Τετάρτη" class="accent-brand-500 rounded">
+                            <span class="text-slate-200 font-medium">Τετάρτη</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-2 bg-slate-900 border border-slate-800 rounded-xl cursor-pointer">
+                            <input type="checkbox" name="assign-days" value="Πέμπτη" class="accent-brand-500 rounded">
+                            <span class="text-slate-200 font-medium">Πέμπτη</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-2 bg-slate-900 border border-slate-800 rounded-xl cursor-pointer">
+                            <input type="checkbox" name="assign-days" value="Παρασκευή" class="accent-brand-500 rounded">
+                            <span class="text-slate-200 font-medium">Παρασκευή</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-2 bg-slate-900 border border-slate-800 rounded-xl cursor-pointer">
+                            <input type="checkbox" name="assign-days" value="Σάββατο" class="accent-brand-500 rounded">
+                            <span class="text-slate-200 font-medium">Σάββατο</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-2 bg-slate-900 border border-slate-800 rounded-xl cursor-pointer">
+                            <input type="checkbox" name="assign-days" value="Κυριακή" class="accent-brand-500 rounded">
+                            <span class="text-slate-200 font-medium">Κυριακή</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Target Slots Selector (Multi-select Batch) -->
+                <div class="space-y-2 bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800">
+                    <label class="font-bold text-slate-200 block">Γεύμα / Ώρα (Πολλαπλή Επιλογή)</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <label class="flex items-center gap-2 p-2 bg-slate-900 border border-slate-800 rounded-xl cursor-pointer">
+                            <input type="checkbox" name="assign-slots" value="Πρωινό" class="accent-brand-500 rounded">
+                            <span class="text-slate-200 font-medium">🌅 Πρωινό</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-2 bg-slate-900 border border-slate-800 rounded-xl cursor-pointer">
+                            <input type="checkbox" name="assign-slots" value="Μεσημεριανό" class="accent-brand-500 rounded" checked>
+                            <span class="text-slate-200 font-medium">☀️ Μεσημεριανό</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-2 bg-slate-900 border border-slate-800 rounded-xl cursor-pointer">
+                            <input type="checkbox" name="assign-slots" value="Βραδινό" class="accent-brand-500 rounded">
+                            <span class="text-slate-200 font-medium">🌙 Βραδινό</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="pt-3 border-t border-slate-800 flex justify-end gap-2">
+                    <button type="button" onclick="closeModal('assign-modal')" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300">Ακύρωση</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold">Αποθήκευση στο Πλάνο</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: Smart Shopping List Generator -->
+    <div id="generate-shopping-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+            <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+                <div>
+                    <h3 class="font-bold text-slate-100 text-base flex items-center gap-2">
+                        <i class="fa-solid fa-wand-magic-sparkles text-emerald-400"></i> Δημιουργία Λίστας Αγορών Εβδομάδας
+                    </h3>
+                    <p class="text-[11px] text-slate-400">Τσεκάρετε ΜΟΝΟ τα υλικά που σας λείπουν για να προστεθούν στη Λίστα Αγορών.</p>
+                </div>
+                <button onclick="closeModal('generate-shopping-modal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div id="generate-shopping-body" class="p-5 overflow-y-auto space-y-4 text-xs">
+                <!-- Dynamically Populated Ingredients checklist per meal -->
+            </div>
+
+            <div class="px-5 py-3 border-t border-slate-800 flex justify-between items-center bg-slate-950">
+                <button onclick="toggleAllGeneratedIngredients(true)" class="text-xs text-brand-400 hover:underline">Επιλογή Όλων</button>
+                <div class="flex gap-2">
+                    <button type="button" onclick="closeModal('generate-shopping-modal')" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs">Ακύρωση</button>
+                    <button type="button" onclick="commitGeneratedShoppingList()" class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg">
+                        <i class="fa-solid fa-cart-plus"></i> Προσθήκη στη Λίστα Syntagoulis
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: Shared Shopping List View -->
+    <div id="shopping-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md max-h-[85vh] flex flex-col p-5 space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="font-bold text-slate-100 flex items-center gap-2">
+                    <i class="fa-solid fa-cart-shopping text-brand-500"></i> Κοινή Λίστα Αγορών Syntagoulis
+                </h3>
+                <button onclick="closeModal('shopping-modal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="flex gap-2">
+                <input type="text" id="custom-cart-item" placeholder="Προσθήκη υλικού..." class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-200 outline-none">
+                <button onclick="addCustomCartItem()" class="px-3 py-1.5 rounded-xl bg-brand-600 text-white text-xs font-semibold">Add</button>
+            </div>
+
+            <div id="shopping-list-container" class="flex-1 overflow-y-auto space-y-1.5 text-xs">
+                <!-- Dynamic List Items -->
+            </div>
+
+            <div class="flex justify-between items-center border-t border-slate-800 pt-3">
+                <button onclick="clearShoppingList()" class="text-xs text-rose-400 hover:underline">Καθαρισμός</button>
+                <button onclick="copyShoppingListText()" class="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs">Αντιγραφή Κειμένου</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-800 text-slate-200 text-xs px-4 py-2.5 rounded-full shadow-2xl opacity-0 transition-all pointer-events-none z-50 flex items-center gap-2">
+        <span id="toast-msg"></span>
+    </div>
+
+    <!-- SCRIPT -->
+    <script>
+        const DAYS = ["Δευτέρα", "Τρίτη", "Τετάρτη", "Πέμπτη", "Παρασκευή", "Σάββατο", "Κυριακή"];
+        const SLOTS = ["Πρωινό", "Μεσημεριανό", "Βραδινό"];
+
+        let appState = {
+            recipes: [],
+            shoppingList: []
+        };
+
+        let plannerState = {
+            schedule: {} // Key format: "Δευτέρα_Μεσημεριανό" -> Array of items [{id, type: 'recipe'|'custom', title, ingredients: [], recipeId}]
+        };
+
+        let currentActiveDayFilter = 'ALL';
+        let currentMealSourceType = 'recipe';
+
+        // INITIALIZATION
+        window.addEventListener('DOMContentLoaded', () => {
+            loadSharedState();
+            loadPlannerState();
+            renderDaysGrid();
+            updateCartBadge();
+        });
+
+        function loadSharedState() {
+            const saved = localStorage.getItem('syntagoulis_state');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    appState.recipes = parsed.recipes || [];
+                    appState.shoppingList = parsed.shoppingList || [];
+                } catch(e) { console.error("Error reading shared syntagoulis_state", e); }
+            }
+        }
+
+        function saveSharedState() {
+            const saved = localStorage.getItem('syntagoulis_state');
+            let parsed = saved ? JSON.parse(saved) : {};
+            parsed.shoppingList = appState.shoppingList;
+            localStorage.setItem('syntagoulis_state', JSON.stringify(parsed));
+            updateCartBadge();
+        }
+
+        function loadPlannerState() {
+            const saved = localStorage.getItem('syntagoulis_planner');
+            if (saved) {
+                try {
+                    plannerState = JSON.parse(saved);
+                } catch(e) { console.error("Error reading planner state", e); }
+            }
+            if (!plannerState.schedule) plannerState.schedule = {};
+        }
+
+        function savePlannerState() {
+            localStorage.setItem('syntagoulis_planner', JSON.stringify(plannerState));
+        }
+
+        // RENDER DAYS GRID
+        function renderDaysGrid() {
+            const container = document.getElementById('days-grid');
+            const visibleDays = currentActiveDayFilter === 'ALL' ? DAYS : [currentActiveDayFilter];
+
+            container.innerHTML = visibleDays.map(day => `
+                <div class="bg-slate-900 border border-slate-800 rounded-3xl p-4 flex flex-col justify-between shadow-xl space-y-3">
+                    <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                        <h3 class="font-black text-slate-100 text-base flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-brand-500"></span>
+                            ${day}
+                        </h3>
+                        <button onclick="openMealAssignModalForDay('${day}')" class="text-xs text-brand-400 hover:text-brand-300 font-semibold flex items-center gap-1">
+                            <i class="fa-solid fa-plus"></i> Προσθήκη
+                        </button>
+                    </div>
+
+                    <div class="space-y-3 flex-1">
+                        ${SLOTS.map(slot => {
+                            const key = `${day}_${slot}`;
+                            const items = plannerState.schedule[key] || [];
+                            const slotIcons = { "Πρωινό": "🌅", "Μεσημεριανό": "☀️", "Βραδινό": "🌙" };
+
+                            return `
+                                <div class="bg-slate-950/70 p-2.5 rounded-2xl border border-slate-800/80 space-y-1.5">
+                                    <div class="flex justify-between items-center text-[11px] font-bold text-slate-400">
+                                        <span>${slotIcons[slot]} ${slot}</span>
+                                        <button onclick="openMealAssignModalForSlot('${day}', '${slot}')" class="text-[10px] text-slate-500 hover:text-brand-400"><i class="fa-solid fa-plus"></i></button>
+                                    </div>
+
+                                    ${items.length === 0 ? `
+                                        <p class="text-[10px] text-slate-600 italic py-1">Κανένα γεύμα</p>
+                                    ` : `
+                                        <div class="space-y-1.5">
+                                            ${items.map((item, itemIdx) => `
+                                                <div class="flex items-center justify-between p-2 rounded-xl bg-slate-900 border border-slate-800 text-xs">
+                                                    <div class="flex items-center gap-2 min-w-0 flex-1">
+                                                        <span class="text-xs">${item.type === 'recipe' ? '📖' : '✏️'}</span>
+                                                        <span class="font-medium text-slate-200 truncate">${escapeHtml(item.title)}</span>
+                                                    </div>
+                                                    <button onclick="removeMealFromSchedule('${key}', ${itemIdx})" class="text-slate-500 hover:text-rose-400 p-1">
+                                                        <i class="fa-solid fa-xmark"></i>
+                                                    </button>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                    `}
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function filterDay(day) {
+            currentActiveDayFilter = day;
+            document.querySelectorAll('.day-tab').forEach(btn => {
+                btn.className = 'day-tab px-3.5 py-1.5 rounded-full font-medium bg-slate-800 text-slate-400 hover:text-white transition';
+            });
+            const activeTab = document.getElementById(`day-tab-${day}`);
+            if (activeTab) {
+                activeTab.className = 'day-tab px-3.5 py-1.5 rounded-full font-bold bg-brand-600 text-white transition';
+            }
+            renderDaysGrid();
+        }
+
+        // MEAL ASSIGNMENT MODAL & BATCH SELECTION
+        function openMealAssignModal() {
+            loadSharedState();
+            populateRecipesDropdown();
+            selectAllDays(false);
+            openModal('assign-modal');
+        }
+
+        function openMealAssignModalForDay(day) {
+            openMealAssignModal();
+            const checkbox = document.querySelector(`input[name="assign-days"][value="${day}"]`);
+            if (checkbox) checkbox.checked = true;
+        }
+
+        function openMealAssignModalForSlot(day, slot) {
+            openMealAssignModal();
+            const dayCb = document.querySelector(`input[name="assign-days"][value="${day}"]`);
+            if (dayCb) dayCb.checked = true;
+
+            document.querySelectorAll('input[name="assign-slots"]').forEach(cb => cb.checked = (cb.value === slot));
+        }
+
+        function populateRecipesDropdown() {
+            const select = document.getElementById('assign-recipe-select');
+            if (appState.recipes.length === 0) {
+                select.innerHTML = `<option value="">-- Δεν βρέθηκαν συνταγές (Προσθέστε στο Syntagoulis) --</option>`;
+                return;
+            }
+
+            select.innerHTML = appState.recipes.map(r => `
+                <option value="${r.id}">${escapeHtml(r.title)} (${r.category || 'Γενικά'})</option>
+            `).join('');
+        }
+
+        function setMealSourceType(type) {
+            currentMealSourceType = type;
+            const btnRecipe = document.getElementById('source-btn-recipe');
+            const btnCustom = document.getElementById('source-btn-custom');
+            const containerRecipe = document.getElementById('source-recipe-container');
+            const containerCustom = document.getElementById('source-custom-container');
+
+            if (type === 'recipe') {
+                btnRecipe.className = 'flex-1 py-2 rounded-lg font-bold transition bg-brand-600 text-white';
+                btnCustom.className = 'flex-1 py-2 rounded-lg font-bold transition text-slate-400 hover:text-white';
+                containerRecipe.classList.remove('hidden');
+                containerCustom.classList.add('hidden');
+            } else {
+                btnCustom.className = 'flex-1 py-2 rounded-lg font-bold transition bg-brand-600 text-white';
+                btnRecipe.className = 'flex-1 py-2 rounded-lg font-bold transition text-slate-400 hover:text-white';
+                containerCustom.classList.remove('hidden');
+                containerRecipe.classList.add('hidden');
+            }
+        }
+
+        function selectAllDays(checked) {
+            document.querySelectorAll('input[name="assign-days"]').forEach(cb => cb.checked = checked);
+        }
+
+        function saveMealAssignment(e) {
+            e.preventDefault();
+
+            const selectedDays = Array.from(document.querySelectorAll('input[name="assign-days"]:checked')).map(cb => cb.value);
+            const selectedSlots = Array.from(document.querySelectorAll('input[name="assign-slots"]:checked')).map(cb => cb.value);
+
+            if (selectedDays.length === 0 || selectedSlots.length === 0) {
+                alert("Παρακαλώ επιλέξτε τουλάχιστον μία ημέρα και ένα γεύμα!");
+                return;
+            }
+
+            let mealItem = null;
+
+            if (currentMealSourceType === 'recipe') {
+                const recipeId = document.getElementById('assign-recipe-select').value;
+                const recipe = appState.recipes.find(r => r.id === recipeId);
+                if (!recipe) {
+                    alert("Παρακαλώ επιλέξτε μια συνταγή!");
+                    return;
+                }
+                mealItem = {
+                    id: 'meal_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                    type: 'recipe',
+                    recipeId: recipe.id,
+                    title: recipe.title,
+                    ingredients: recipe.ingredients || []
+                };
+            } else {
+                const title = document.getElementById('assign-custom-title').value.trim();
+                const ingRaw = document.getElementById('assign-custom-ingredients').value.trim();
+                if (!title) {
+                    alert("Παρακαλώ εισάγετε τίτλο γεύματος!");
+                    return;
+                }
+                const customIngs = ingRaw ? ingRaw.split(',').map(s => ({ name: s.trim() })).filter(i => i.name) : [];
+                mealItem = {
+                    id: 'meal_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                    type: 'custom',
+                    title: title,
+                    ingredients: customIngs
+                };
+            }
+
+            // Batch assign across selected days and slots
+            let addedCount = 0;
+            selectedDays.forEach(day => {
+                selectedSlots.forEach(slot => {
+                    const key = `${day}_${slot}`;
+                    if (!plannerState.schedule[key]) plannerState.schedule[key] = [];
+                    plannerState.schedule[key].push({ ...mealItem, id: 'meal_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4) });
+                    addedCount++;
+                });
+            });
+
+            savePlannerState();
+            renderDaysGrid();
+            closeModal('assign-modal');
+            showToast(`Προστέθηκε επιτυχώς σε ${addedCount} slots!`);
+        }
+
+        function removeMealFromSchedule(key, index) {
+            if (plannerState.schedule[key]) {
+                plannerState.schedule[key].splice(index, 1);
+                if (plannerState.schedule[key].length === 0) delete plannerState.schedule[key];
+                savePlannerState();
+                renderDaysGrid();
+            }
+        }
+
+        function confirmResetWeek() {
+            if (confirm("Θέλετε σίγουρα να καθαρίσετε όλα τα γεύματα της εβδομάδας;")) {
+                plannerState.schedule = {};
+                savePlannerState();
+                renderDaysGrid();
+                showToast("Το εβδομαδιαίο πλάνο καθαρίστηκε.");
+            }
+        }
+
+        // SMART SHOPPING LIST GENERATOR
+        function openGenerateShoppingModal() {
+            const body = document.getElementById('generate-shopping-body');
+            const allAssignedMeals = [];
+
+            DAYS.forEach(day => {
+                SLOTS.forEach(slot => {
+                    const key = `${day}_${slot}`;
+                    const items = plannerState.schedule[key] || [];
+                    items.forEach(item => {
+                        allAssignedMeals.push({ day, slot, item });
+                    });
+                });
+            });
+
+            if (allAssignedMeals.length === 0) {
+                body.innerHTML = `<p class="text-slate-400 text-center py-6">Δεν έχουν προστεθεί γεύματα στο πλάνο της εβδομάδας.</p>`;
+                openModal('generate-shopping-modal');
+                return;
+            }
+
+            body.innerHTML = allAssignedMeals.map((entry, idx) => `
+                <div class="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 space-y-2">
+                    <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                        <span class="font-bold text-slate-100 flex items-center gap-1.5">
+                            <span class="text-brand-400">📅 ${entry.day} (${entry.slot}):</span> ${escapeHtml(entry.item.title)}
+                        </span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">${entry.item.type === 'recipe' ? 'Συνταγή' : 'Ελεύθερο'}</span>
+                    </div>
+
+                    <div class="space-y-1 pl-2">
+                        ${(entry.item.ingredients || []).length === 0 ? `
+                            <label class="flex items-center gap-2 cursor-pointer text-slate-300 py-1">
+                                <input type="checkbox" data-gen-item="${escapeHtml(entry.item.title)}" class="gen-ing-cb accent-emerald-500 rounded" checked>
+                                <span>${escapeHtml(entry.item.title)} (Γενικό υλικό)</span>
+                            </label>
+                        ` : (entry.item.ingredients || []).map((ing, ingIdx) => {
+                            const ingText = `${ing.amount ? ing.amount + ' ' : ''}${ing.unit || ''} ${ing.name}`.trim();
+                            return `
+                                <label class="flex items-center gap-2 cursor-pointer text-slate-300 py-0.5 hover:text-white">
+                                    <input type="checkbox" data-gen-item="${escapeHtml(ingText)}" class="gen-ing-cb accent-emerald-500 rounded" checked>
+                                    <span>${escapeHtml(ingText)}</span>
+                                </label>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `).join('');
+
+            openModal('generate-shopping-modal');
+        }
+
+        function toggleAllGeneratedIngredients(checked) {
+            document.querySelectorAll('.gen-ing-cb').forEach(cb => cb.checked = checked);
+        }
+
+        function commitGeneratedShoppingList() {
+            const checkedBoxes = document.querySelectorAll('.gen-ing-cb:checked');
+            if (checkedBoxes.length === 0) {
+                alert("Παρακαλώ επιλέξτε τουλάχιστον ένα υλικό.");
+                return;
+            }
+
+            loadSharedState();
+            let addedCount = 0;
+
+            checkedBoxes.forEach(cb => {
+                const itemText = cb.getAttribute('data-gen-item');
+                if (itemText && !appState.shoppingList.some(i => i.name.toLowerCase() === itemText.toLowerCase())) {
+                    appState.shoppingList.push({ id: Date.now() + Math.random(), name: itemText, checked: false });
+                    addedCount++;
+                }
+            });
+
+            saveSharedState();
+            closeModal('generate-shopping-modal');
+            showToast(`Προστέθηκαν ${addedCount} υλικά στη Λίστα Syntagoulis!`);
+        }
+
+        // SHARED SHOPPING LIST MODAL
+        function openShoppingModal() {
+            loadSharedState();
+            renderShoppingList();
+            openModal('shopping-modal');
+        }
+
+        function addCustomCartItem() {
+            const input = document.getElementById('custom-cart-item');
+            if (input.value.trim()) {
+                appState.shoppingList.push({ id: Date.now(), name: input.value.trim(), checked: false });
+                input.value = '';
+                saveSharedState();
+                renderShoppingList();
+            }
+        }
+
+        function renderShoppingList() {
+            const container = document.getElementById('shopping-list-container');
+            if (appState.shoppingList.length === 0) {
+                container.innerHTML = `<p class="text-slate-500 text-center py-4">Η λίστα είναι άδεια.</p>`;
+                return;
+            }
+
+            container.innerHTML = appState.shoppingList.map(item => `
+                <div class="flex items-center justify-between p-2 bg-slate-950 rounded-xl border border-slate-800">
+                    <label class="flex items-center gap-2 cursor-pointer flex-1">
+                        <input type="checkbox" ${item.checked ? 'checked' : ''} onchange="toggleCartItem(${item.id})" class="accent-brand-500">
+                        <span class="${item.checked ? 'line-through text-slate-500' : 'text-slate-200'}">${escapeHtml(item.name)}</span>
+                    </label>
+                    <button onclick="removeCartItem(${item.id})" class="text-slate-500 hover:text-rose-400 p-1"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            `).join('');
+        }
+
+        function toggleCartItem(id) {
+            const item = appState.shoppingList.find(i => i.id === id);
+            if (item) item.checked = !item.checked;
+            saveSharedState();
+            renderShoppingList();
+        }
+
+        function removeCartItem(id) {
+            appState.shoppingList = appState.shoppingList.filter(i => i.id !== id);
+            saveSharedState();
+            renderShoppingList();
+        }
+
+        function clearShoppingList() {
+            appState.shoppingList = [];
+            saveSharedState();
+            renderShoppingList();
+        }
+
+        function updateCartBadge() {
+            const badge = document.getElementById('cart-badge');
+            if (appState.shoppingList.length > 0) {
+                badge.textContent = appState.shoppingList.length;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+        function copyShoppingListText() {
+            const text = appState.shoppingList.map(i => `${i.checked ? '[X]' : '[ ]'} ${i.name}`).join('\n');
+            navigator.clipboard.writeText(text);
+            showToast("Η λίστα αντιγράφηκε!");
+        }
+
+        // TEXT SHARE / EXPORT
+        function copyWeeklyPlanText() {
+            let text = "📅 *Εβδομαδιαίο Πλάνο Γευμάτων Syntagoulis*\n\n";
+
+            DAYS.forEach(day => {
+                text += `📌 *${day}*\n`;
+                SLOTS.forEach(slot => {
+                    const key = `${day}_${slot}`;
+                    const items = plannerState.schedule[key] || [];
+                    if (items.length > 0) {
+                        text += `  • ${slot}: ${items.map(i => i.title).join(', ')}\n`;
+                    }
+                });
+                text += "\n";
+            });
+
+            navigator.clipboard.writeText(text);
+            showToast("Το εβδομαδιαίο πλάνο αντιγράφηκε!");
+        }
+
+        // UTILS
+        function openModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-msg').textContent = msg;
+            toast.classList.remove('opacity-0');
+            setTimeout(() => toast.classList.add('opacity-0'), 2500);
+        }
+
+        function escapeHtml(str) {
+            return (str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        }
+    </script>
+</body>
+</html>
