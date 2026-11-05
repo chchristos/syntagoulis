@@ -26,6 +26,15 @@
     </script>
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- PWA Web Manifest & Mobile Meta Tags -->
+    <meta name="theme-color" content="#020617">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Syntagoulis">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" id="pwa-manifest">
+
     <!-- Google Identity Services (GIS) API -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <!-- QRCode.js -->
@@ -52,8 +61,13 @@
             </div>
             
             <div class="flex items-center gap-1.5 shrink-0">
+                <!-- PWA Install Button (Appears automatically on Mobile/Chrome) -->
+                <button id="install-pwa-btn" onclick="installPWA()" class="px-2.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 text-xs font-bold flex items-center gap-1 border border-amber-500/30 transition" title="Εγκατάσταση App">
+                    <i class="fa-solid fa-download"></i>
+                    <span class="hidden sm:inline">Install</span>
+                </button>
                 <!-- Navigation Link to Meal Planner -->
-                <a href="syntagoulis_planner.html" class="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-brand-400 text-xs font-bold flex items-center gap-1.5 border border-slate-700 transition" title="Εβδομαδιαίο Πλάνο">
+                <a href="planner.html" class="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-brand-400 text-xs font-bold flex items-center gap-1.5 border border-slate-700 transition" title="Εβδομαδιαίο Πλάνο">
                     <i class="fa-solid fa-calendar-week"></i>
                     <span class="hidden sm:inline text-slate-200">Πλάνο</span>
                 </a>
@@ -376,38 +390,7 @@
 
             <div class="pt-3 border-t border-slate-800 flex justify-end">
                 <button onclick="saveSettings()" class="px-5 py-2 rounded-xl bg-brand-600 text-white font-semibold">Αποθήκευση</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Toast Notification -->
-    <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-800 text-slate-200 text-xs px-4 py-2.5 rounded-full shadow-2xl opacity-0 transition-all pointer-events-none z-50 flex items-center gap-2">
-        <span id="toast-msg"></span>
-    </div>
-
-    <!-- APPLICATION LOGIC -->
-    <script>
-        // APP STATE
-        let state = {
-            recipes: [],
-            categories: ["Κυρίως", "Σούπες", "Air Fryer", "High Protein", "Ψωμί & Ζύμες", "Γρήγορα", "Γλυκά", "Άλλο"],
-            equipment: ["Air Fryer", "Παρασκευαστής Ψωμιού", "Χύτρα Ταχύτητας", "One-Pot", "Φούρνος", "Τηγάνι"],
-            shoppingList: [],
-            selectedCategory: 'ALL',
-            selectedEquipment: 'ALL',
-            searchQuery: '',
-            gdriveClientId: '',
-            gdriveToken: null
-        };
-
-        let currentCookRecipe = null;
-        let cookServings = 1;
-        let timerInterval = null;
-        let timerSeconds = 0;
-        let activeShareRecipe = null;
-        let tokenClient = null;
-
-        // SANITIZATION UTILITY: Strips AI formatting spans & markdown markers across all fields
+        // SANITIZATION UTILITY: Strips AI formatting spans & markdown markers
         function sanitizeText(str) {
             if (!str || typeof str !== 'string') return str || '';
             return str
@@ -415,36 +398,67 @@
                 .replace(/\(start_span\)/gi, '')
                 .replace(/\(end_span\)/gi, '')
                 .replace(/\[\/?span[^\]]*\]/gi, '')
-                .replace(/\[\d+\]/g, '')
                 .replace(/^#+\s*/, '')
-                .replace(/\s+/g, ' ')
                 .trim();
         }
 
-        function sanitizeRecipe(r) {
-            if (!r || typeof r !== 'object') return r;
-            return {
-                ...r,
-                title: sanitizeText(r.title),
-                category: sanitizeText(r.category),
-                equipment: sanitizeText(r.equipment),
-                ingredients: (r.ingredients || []).map(i => {
-                    if (typeof i === 'string') {
-                        return { amount: 1, unit: 'τμχ', name: sanitizeText(i) };
-                    }
-                    return {
-                        ...i,
-                        amount: i.amount || 1,
-                        unit: sanitizeText(i.unit),
-                        name: sanitizeText(i.name)
-                    };
-                }),
-                steps: (r.steps || []).map(s => sanitizeText(s))
+        // PWA MANIFEST & SERVICE WORKER INITIALIZATION
+        function initPWA() {
+            // Dynamic Manifest Generation
+            const manifestObj = {
+                name: "Syntagoulis - Smart Recipe Manager",
+                short_name: "Syntagoulis",
+                start_url: "./index.html",
+                display: "standalone",
+                background_color: "#020617",
+                theme_color: "#ea580c",
+                icons: [
+                    { src: "https://placehold.co/192x192/ea580c/ffffff.png?text=👨‍🍳", sizes: "192x192", type: "image/png" },
+                    { src: "https://placehold.co/512x512/ea580c/ffffff.png?text=👨‍🍳", sizes: "512x512", type: "image/png" }
+                ]
             };
+            const manifestBlob = new Blob([JSON.stringify(manifestObj)], { type: 'application/manifest+json' });
+            const manifestLink = document.getElementById('pwa-manifest');
+            if (manifestLink) manifestLink.href = URL.createObjectURL(manifestBlob);
+
+            // Register minimal inline Service Worker
+            if ('serviceWorker' in navigator) {
+                const swCode = `
+                    self.addEventListener('install', e => self.skipWaiting());
+                    self.addEventListener('activate', e => self.clients.claim());
+                    self.addEventListener('fetch', e => e.respondWith(fetch(e.request).catch(() => new Response('Offline'))));
+                `;
+                const swBlob = new Blob([swCode], { type: 'text/javascript' });
+                navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(() => {});
+            }
+        }
+
+        // PWA Install Prompt Handler
+        let deferredPrompt = null;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            const installBtn = document.getElementById('install-pwa-btn');
+            if (installBtn) installBtn.classList.remove('hidden');
+        });
+
+        function installPWA() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choice) => {
+                    if (choice.outcome === 'accepted') {
+                        showToast("Η εφαρμογή εγκαταστάθηκε στην αρχική οθόνη!");
+                    }
+                    deferredPrompt = null;
+                });
+            } else {
+                alert("Για να την εγκαταστήσετε στο κινητό:\n\n• Σε Android (Chrome): Πατήστε τις 3 τελείες (⋮) πάνω δεξιά > 'Προσθήκη στην αρχική οθόνη' (Add to Home screen).\n\n• Σε iPhone (Safari): Πατήστε το κουμπί Share (↑) > 'Προσθήκη στην οθόνη αφετηρίας'.");
+            }
         }
 
         // INITIALIZATION
         window.addEventListener('DOMContentLoaded', () => {
+            initPWA();
             loadLocalState();
             renderCategoryChips();
             renderEquipmentChips();
